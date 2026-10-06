@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import { connectDB } from './config/db.js';
 import { notFound, errorHandler } from './middleware/error.js';
 
@@ -27,6 +28,18 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Ensure database connection before handling requests (crucial for serverless cold-starts)
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState < 1) {
+    try {
+      await connectDB();
+    } catch (err) {
+      return res.status(500).json({ success: false, message: 'Database connection failed: ' + err.message });
+    }
+  }
+  next();
+});
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -55,11 +68,15 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Connect Database & Start Server
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`[VAYORA Server] Running on http://localhost:${PORT}`);
+// Connect Database & Start Server for local standalone runtime
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`[VAYORA Server] Running on http://localhost:${PORT}`);
+    });
+  }).catch((err) => {
+    console.error('[VAYORA Server] Failed to initialize database:', err.message);
   });
-}).catch((err) => {
-  console.error('[VAYORA Server] Failed to initialize database:', err.message);
-});
+}
+
+export default app;
