@@ -3,6 +3,7 @@ import { Search, Sparkles, Filter, X } from 'lucide-react';
 import api from '../api/client';
 import ActivityCard from '../components/ActivityCard';
 import BookingModal from '../components/BookingModal';
+import { fallbackActivities } from '../data/fallbackData';
 
 export default function Activities() {
   const [activities, setActivities] = useState([]);
@@ -33,9 +34,15 @@ export default function Activities() {
       if (sortBy) params.sort = sortBy;
 
       const res = await api.get('/activities', { params });
-      setActivities(res.data.data || []);
+      const list = res.data.data || [];
+      if (list.length > 0 || search.trim() || category !== 'All') {
+        setActivities(list);
+      } else {
+        setActivities(fallbackActivities);
+      }
     } catch (err) {
       console.error('Failed to load activities:', err);
+      setActivities(fallbackActivities);
     } finally {
       setLoading(false);
     }

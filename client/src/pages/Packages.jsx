@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Clock, Filter, X, Package as PackageIcon } from 'lucide-react';
 import api from '../api/client';
 import PackageCard from '../components/PackageCard';
+import { fallbackPackages } from '../data/fallbackData';
 
 export default function Packages() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,9 +29,15 @@ export default function Packages() {
       if (maxPrice) params.maxPrice = maxPrice;
 
       const res = await api.get('/packages', { params });
-      setPackages(res.data.data || []);
+      const list = res.data.data || [];
+      if (list.length > 0 || search.trim() || destinationFilter.trim() || maxPrice) {
+        setPackages(list);
+      } else {
+        setPackages(fallbackPackages);
+      }
     } catch (err) {
       console.error('Failed to load packages:', err);
+      setPackages(fallbackPackages);
     } finally {
       setLoading(false);
     }

@@ -21,6 +21,13 @@ import HotelCard from '../components/HotelCard';
 import ActivityCard from '../components/ActivityCard';
 import BookingModal from '../components/BookingModal';
 
+import {
+  fallbackDestinations,
+  fallbackPackages,
+  fallbackHotels,
+  fallbackActivities,
+} from '../data/fallbackData';
+
 export default function Home() {
   const navigate = useNavigate();
 
@@ -45,18 +52,27 @@ export default function Home() {
       try {
         setLoading(true);
         const [destRes, pkgRes, hotelRes, actRes] = await Promise.all([
-          api.get('/destinations?featured=true'),
-          api.get('/packages?featured=true'),
-          api.get('/hotels?featured=true'),
-          api.get('/activities?featured=true'),
+          api.get('/destinations?featured=true').catch(() => ({ data: { data: [] } })),
+          api.get('/packages?featured=true').catch(() => ({ data: { data: [] } })),
+          api.get('/hotels?featured=true').catch(() => ({ data: { data: [] } })),
+          api.get('/activities?featured=true').catch(() => ({ data: { data: [] } })),
         ]);
 
-        setDestinations(destRes.data.data?.slice(0, 6) || []);
-        setPackages(pkgRes.data.data?.slice(0, 4) || []);
-        setHotels(hotelRes.data.data?.slice(0, 4) || []);
-        setActivities(actRes.data.data?.slice(0, 4) || []);
+        const destList = destRes.data.data?.slice(0, 6) || [];
+        const pkgList = pkgRes.data.data?.slice(0, 4) || [];
+        const hotelList = hotelRes.data.data?.slice(0, 4) || [];
+        const actList = actRes.data.data?.slice(0, 4) || [];
+
+        setDestinations(destList.length > 0 ? destList : fallbackDestinations.slice(0, 6));
+        setPackages(pkgList.length > 0 ? pkgList : fallbackPackages.slice(0, 4));
+        setHotels(hotelList.length > 0 ? hotelList : fallbackHotels.slice(0, 4));
+        setActivities(actList.length > 0 ? actList : fallbackActivities.slice(0, 4));
       } catch (err) {
-        console.error('Home data load failed:', err.message);
+        console.error('Home data load failed, using fallback catalog:', err.message);
+        setDestinations(fallbackDestinations.slice(0, 6));
+        setPackages(fallbackPackages.slice(0, 4));
+        setHotels(fallbackHotels.slice(0, 4));
+        setActivities(fallbackActivities.slice(0, 4));
       } finally {
         setLoading(false);
       }

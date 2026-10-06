@@ -45,7 +45,22 @@ export const getHotels = async (req, res) => {
     if (sort === 'rating-desc') sortOption = { rating: -1 };
     if (sort === 'name-asc') sortOption = { name: 1 };
 
-    const hotels = await Hotel.find(query).sort(sortOption);
+    let hotels = [];
+    try {
+      hotels = await Hotel.find(query).sort(sortOption);
+    } catch (dbErr) {
+      console.warn('[VAYORA] Hotel DB query notice:', dbErr.message);
+    }
+
+    if (!hotels || hotels.length === 0) {
+      const { seedHotels } = await import('../data/seedData.js');
+      let fallbackList = [...seedHotels];
+      if (featured === 'true') {
+        fallbackList = fallbackList.filter((h) => h.featured);
+      }
+      hotels = fallbackList;
+    }
+
     res.json({ success: true, count: hotels.length, data: hotels });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

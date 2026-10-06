@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Hotel as HotelIcon, MapPin, X } from 'lucide-react';
 import api from '../api/client';
 import HotelCard from '../components/HotelCard';
+import { fallbackHotels } from '../data/fallbackData';
 
 export default function Hotels() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,9 +35,15 @@ export default function Hotels() {
       if (maxPrice) params.maxPrice = maxPrice;
 
       const res = await api.get('/hotels', { params });
-      setHotels(res.data.data || []);
+      const list = res.data.data || [];
+      if (list.length > 0 || search.trim() || amenity !== 'all' || maxPrice) {
+        setHotels(list);
+      } else {
+        setHotels(fallbackHotels);
+      }
     } catch (err) {
       console.error('Failed to load hotels:', err);
+      setHotels(fallbackHotels);
     } finally {
       setLoading(false);
     }

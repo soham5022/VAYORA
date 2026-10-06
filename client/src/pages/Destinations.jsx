@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, SlidersHorizontal, MapPin, X } from 'lucide-react';
 import api from '../api/client';
 import DestinationCard from '../components/DestinationCard';
+import { fallbackDestinations } from '../data/fallbackData';
 
 export default function Destinations() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -37,9 +38,15 @@ export default function Destinations() {
       if (maxPrice) params.maxPrice = maxPrice;
 
       const res = await api.get('/destinations', { params });
-      setDestinations(res.data.data || []);
+      const list = res.data.data || [];
+      if (list.length > 0 || search.trim() || category !== 'All' || maxPrice) {
+        setDestinations(list);
+      } else {
+        setDestinations(fallbackDestinations);
+      }
     } catch (err) {
       console.error('Failed to fetch destinations:', err);
+      setDestinations(fallbackDestinations);
     } finally {
       setLoading(false);
     }

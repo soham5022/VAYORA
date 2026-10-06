@@ -47,7 +47,22 @@ export const getPackages = async (req, res) => {
     if (sort === 'rating-desc') sortOption = { rating: -1 };
     if (sort === 'duration-asc') sortOption = { durationDays: 1 };
 
-    const packages = await Package.find(query).sort(sortOption);
+    let packages = [];
+    try {
+      packages = await Package.find(query).sort(sortOption);
+    } catch (dbErr) {
+      console.warn('[VAYORA] Package DB query notice:', dbErr.message);
+    }
+
+    if (!packages || packages.length === 0) {
+      const { seedPackages } = await import('../data/seedData.js');
+      let fallbackList = [...seedPackages];
+      if (featured === 'true') {
+        fallbackList = fallbackList.filter((p) => p.featured);
+      }
+      packages = fallbackList;
+    }
+
     res.json({ success: true, count: packages.length, data: packages });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

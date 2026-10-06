@@ -45,7 +45,25 @@ export const getActivities = async (req, res) => {
     if (sort === 'rating-desc') sortOption = { rating: -1 };
     if (sort === 'name-asc') sortOption = { name: 1 };
 
-    const activities = await Activity.find(query).sort(sortOption);
+    let activities = [];
+    try {
+      activities = await Activity.find(query).sort(sortOption);
+    } catch (dbErr) {
+      console.warn('[VAYORA] Activity DB query notice:', dbErr.message);
+    }
+
+    if (!activities || activities.length === 0) {
+      const { seedActivities } = await import('../data/seedData.js');
+      let fallbackList = [...seedActivities];
+      if (category && category !== 'All') {
+        fallbackList = fallbackList.filter((a) => a.category.toLowerCase() === category.toLowerCase());
+      }
+      if (featured === 'true') {
+        fallbackList = fallbackList.filter((a) => a.featured);
+      }
+      activities = fallbackList;
+    }
+
     res.json({ success: true, count: activities.length, data: activities });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

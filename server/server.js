@@ -29,13 +29,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Ensure database connection before handling requests (crucial for serverless cold-starts)
+// Ensure database connection attempt before handling requests
 app.use(async (req, res, next) => {
   if (mongoose.connection.readyState < 1) {
     try {
       await connectDB();
     } catch (err) {
-      return res.status(500).json({ success: false, message: 'Database connection failed: ' + err.message });
+      console.warn('[VAYORA] Cold start DB connect notice:', err.message);
     }
   }
   next();

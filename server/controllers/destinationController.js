@@ -44,7 +44,25 @@ export const getDestinations = async (req, res) => {
     if (sort === 'rating-desc') sortOption = { rating: -1 };
     if (sort === 'name-asc') sortOption = { name: 1 };
 
-    const destinations = await Destination.find(query).sort(sortOption);
+    let destinations = [];
+    try {
+      destinations = await Destination.find(query).sort(sortOption);
+    } catch (dbErr) {
+      console.warn('[VAYORA] Destination DB query notice:', dbErr.message);
+    }
+
+    if (!destinations || destinations.length === 0) {
+      const { seedDestinations } = await import('../data/seedData.js');
+      let fallbackList = [...seedDestinations];
+      if (category && category !== 'All') {
+        fallbackList = fallbackList.filter((d) => d.category === category);
+      }
+      if (featured === 'true') {
+        fallbackList = fallbackList.filter((d) => d.featured);
+      }
+      destinations = fallbackList;
+    }
+
     res.json({ success: true, count: destinations.length, data: destinations });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
