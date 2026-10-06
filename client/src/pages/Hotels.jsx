@@ -9,8 +9,8 @@ export default function Hotels() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
-  const [hotels, setHotels] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [hotels, setHotels] = useState(() => fallbackHotels);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(initialSearch);
   const [amenity, setAmenity] = useState('all');
   const [sortBy, setSortBy] = useState('rating-desc');

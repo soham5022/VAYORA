@@ -36,12 +36,12 @@ export default function Home() {
   const [searchDate, setSearchDate] = useState('');
   const [searchTravelers, setSearchTravelers] = useState(2);
 
-  // Data states
-  const [destinations, setDestinations] = useState([]);
-  const [packages, setPackages] = useState([]);
-  const [hotels, setHotels] = useState([]);
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Data states - Preloaded for instantaneous 0ms rendering (Stale-While-Revalidate pattern)
+  const [destinations, setDestinations] = useState(() => fallbackDestinations.slice(0, 6));
+  const [packages, setPackages] = useState(() => fallbackPackages.slice(0, 4));
+  const [hotels, setHotels] = useState(() => fallbackHotels.slice(0, 4));
+  const [activities, setActivities] = useState(() => fallbackActivities.slice(0, 4));
+  const [loading, setLoading] = useState(false);
 
   // Booking modal for quick book
   const [bookingModalItem, setBookingModalItem] = useState(null);
@@ -50,7 +50,6 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
         const [destRes, pkgRes, hotelRes, actRes] = await Promise.all([
           api.get('/destinations?featured=true').catch(() => ({ data: { data: [] } })),
           api.get('/packages?featured=true').catch(() => ({ data: { data: [] } })),

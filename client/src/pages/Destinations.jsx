@@ -9,8 +9,8 @@ export default function Destinations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
-  const [destinations, setDestinations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [destinations, setDestinations] = useState(() => fallbackDestinations);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(initialSearch);
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('rating-desc');

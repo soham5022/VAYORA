@@ -6,8 +6,8 @@ import BookingModal from '../components/BookingModal';
 import { fallbackActivities } from '../data/fallbackData';
 
 export default function Activities() {
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState(() => fallbackActivities);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [sortBy, setSortBy] = useState('rating-desc');

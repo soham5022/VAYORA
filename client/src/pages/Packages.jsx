@@ -10,8 +10,8 @@ export default function Packages() {
   const initialSearch = searchParams.get('search') || '';
   const initialDest = searchParams.get('destination') || '';
 
-  const [packages, setPackages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [packages, setPackages] = useState(() => fallbackPackages);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(initialSearch);
   const [destinationFilter, setDestinationFilter] = useState(initialDest);
   const [duration, setDuration] = useState('all');
