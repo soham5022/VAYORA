@@ -1,0 +1,17 @@
+{
+  "name": "vayora-travel-platform",
+  "version": "1.0.0",
+  "description": "VAYORA - Travel & Tourism Management System",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "seed": "npm --prefix server run seed",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,emerald\" \"npm run server\" \"npm run client\"",
+    "test": "node server/test-flows.js"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
