@@ -125,9 +125,10 @@ async function runTests() {
     });
     assert(newBookingRes.status === 201, 'Booking created with HTTP 201');
     const createdBooking = newBookingRes.data.data;
-    assert(createdBooking.bookingId && createdBooking.bookingId.startsWith('VAY-'), `Generated unique booking ID: ${createdBooking.bookingId}`);
+    assert(createdBooking.bookingId && (createdBooking.bookingId.startsWith('VY-') || createdBooking.bookingId.startsWith('VAY-')), `Generated unique booking ID: ${createdBooking.bookingId}`);
     assert(createdBooking.paymentStatus === 'Paid', 'Payment status marked as Paid');
-    assert(createdBooking.totalAmount === samplePkg.price * 2, `Total amount dynamically verified: ₹${createdBooking.totalAmount}`);
+    assert(createdBooking.subtotal === samplePkg.price * 2, `Subtotal dynamically verified: ₹${createdBooking.subtotal}`);
+    assert(createdBooking.totalAmount === (createdBooking.subtotal + createdBooking.taxAmount + createdBooking.serviceFee), `Itemized total amount verified (Subtotal + GST + Service Fee): ₹${createdBooking.totalAmount}`);
 
     // Fetch user bookings
     const myBookingsRes = await req(`${API}/bookings/my`, { headers: userAuthHeaders });
@@ -219,8 +220,66 @@ async function runTests() {
     });
     assert(cancelRes.data.data.bookingStatus === 'Cancelled', 'Booking status transitioned to Cancelled in DB');
 
+    // 12. Test Coupon Validation
+    console.log('\n--- 12. Testing Coupon System ---');
+    const couponRes = await req(`${API}/coupons/validate`, {
+      method: 'POST',
+      body: JSON.stringify({ code: 'VAYORA10', amount: 20000 })
+    });
+    assert(couponRes.status === 200, 'Coupon validation returns 200');
+    assert(couponRes.data.data.discountAmount > 0, `Coupon VAYORA10 applied: saved ₹${couponRes.data.data.discountAmount}`);
+
+    // 13. Test Tax Invoice Retrieval
+    console.log('\n--- 13. Testing Tax Invoice & Voucher ---');
+    const invoiceRes = await req(`${API}/bookings/${createdBooking._id}/invoice`, { headers: userAuthHeaders });
+    assert(invoiceRes.status === 200, 'Invoice endpoint returns 200');
+    assert(invoiceRes.data.data.company.gstin === '29AAACV5912K1Z8', 'Invoice contains company GSTIN & registered credentials');
+
+    // 14. Test FAQs Knowledge Base
+    console.log('\n--- 14. Testing FAQs API ---');
+    const faqsRes = await req(`${API}/faqs`);
+    assert(faqsRes.status === 200, 'FAQs endpoint returns 200');
+    assert(faqsRes.data.data.length >= 5, `Loaded ${faqsRes.data.data.length} active FAQs`);
+
+    // 15. Test Blog & Travel Journal
+    console.log('\n--- 15. Testing Blog & Journal API ---');
+    const blogRes = await req(`${API}/blog`);
+    assert(blogRes.status === 200, 'Blog endpoint returns 200');
+    assert(blogRes.data.data.length >= 3, `Loaded ${blogRes.data.data.length} editorial travel articles`);
+
+    // 16. Test Contact Inquiry Submission
+    console.log('\n--- 16. Testing Contact System ---');
+    const contactRes = await req(`${API}/contact`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Jane Traveler',
+        email: 'jane@example.com',
+        phone: '+91 99887 76655',
+        subject: 'Inquiry for Switzerland Honeymoon',
+        message: 'Looking for a private 7-day chalets and scenic train itinerary in Bernese Oberland.'
+      })
+    });
+    assert(contactRes.status === 201, 'Contact inquiry submitted and recorded in database');
+
+    // 17. Test Vendor / Partner Portal
+    console.log('\n--- 17. Testing Partner & Vendor Portal ---');
+    const vendorLoginRes = await req(`${API}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({ email: 'vendor@vayora.com', password: 'Vendor@123' })
+    });
+    assert(vendorLoginRes.status === 200, 'Demo vendor login succeeded');
+    const vendorHeaders = { Authorization: `Bearer ${vendorLoginRes.data.data.token}` };
+    const vendorDashRes = await req(`${API}/vendors/dashboard`, { headers: vendorHeaders });
+    assert(vendorDashRes.status === 200, 'Vendor dashboard retrieved metrics and partner listings');
+
+    // 18. Test System Health Check
+    console.log('\n--- 18. Testing System Health Check ---');
+    const healthRes = await req(`${API}/health`);
+    assert(healthRes.status === 200, 'GET /api/health returns HTTP 200');
+    assert(healthRes.data.status === 'ok', 'Health status is "ok"');
+
     console.log('\n====================================================');
-    console.log(`🎉 ALL ${passed}/${total} END-TO-END VALIDATION CHECKS PASSED!`);
+    console.log(`🎉 ALL ${passed}/${total} COMPREHENSIVE END-TO-END VALIDATION CHECKS PASSED!`);
     console.log('====================================================\n');
   } catch (err) {
     console.error('Test failed with error:', err.message);

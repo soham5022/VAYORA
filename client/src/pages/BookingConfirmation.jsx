@@ -15,11 +15,13 @@ import {
 import confetti from 'canvas-confetti';
 import api from '../api/client';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import InvoiceModal from '../components/InvoiceModal';
 
 export default function BookingConfirmation() {
   const { id } = useParams();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
 
   useEffect(() => {
     // Trigger celebratory confetti burst
@@ -189,13 +191,21 @@ export default function BookingConfirmation() {
 
         {/* Action Buttons (Hidden during printing) */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-charcoal-100 print:hidden">
-          <button
-            onClick={handlePrint}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-charcoal-200 text-charcoal-700 hover:bg-charcoal-50 font-bold text-xs flex items-center justify-center gap-2"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Download / Print Receipt</span>
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setInvoiceOpen(true)}
+              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-ocean-600 hover:bg-ocean-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Official Tax Invoice</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-charcoal-200 text-charcoal-700 hover:bg-charcoal-50 font-bold text-xs flex items-center justify-center gap-2"
+            >
+              <span>Quick Print</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Link
@@ -213,6 +223,12 @@ export default function BookingConfirmation() {
           </div>
         </div>
       </div>
+
+      <InvoiceModal
+        isOpen={invoiceOpen}
+        onClose={() => setInvoiceOpen(false)}
+        booking={booking}
+      />
     </div>
   );
 }

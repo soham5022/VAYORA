@@ -186,28 +186,43 @@ export default function Footer() {
             </h3>
             <ul className="space-y-2.5 text-sm text-charcoal-400">
               <li>
-                <a href="#about" className="hover:text-white transition-colors">
+                <Link to="/about" className="hover:text-white transition-colors">
                   About VAYORA
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#contact" className="hover:text-white transition-colors">
+                <Link to="/contact" className="hover:text-white transition-colors">
                   Support & Contact
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#privacy" className="hover:text-white transition-colors">
+                <Link to="/faq" className="hover:text-white transition-colors">
+                  FAQs & Knowledge Base
+                </Link>
+              </li>
+              <li>
+                <Link to="/blog" className="hover:text-white transition-colors">
+                  Travel Stories & Guides
+                </Link>
+              </li>
+              <li>
+                <Link to="/vendor/register" className="hover:text-white transition-colors">
+                  Partner / Vendor Portal
+                </Link>
+              </li>
+              <li>
+                <Link to="/refund-policy" className="hover:text-white transition-colors">
+                  Refund & Cancellation Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="hover:text-white transition-colors">
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#terms" className="hover:text-white transition-colors">
+                <Link to="/terms" className="hover:text-white transition-colors">
                   Terms of Service
-                </a>
-              </li>
-              <li>
-                <Link to="/login" className="hover:text-white transition-colors">
-                  Account Login
                 </Link>
               </li>
             </ul>

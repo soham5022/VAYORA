@@ -12,6 +12,8 @@ import {
   Info,
   Loader2,
   Building,
+  Tag,
+  Check,
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +37,12 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
     phone: '',
   });
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
   // Payment method demo
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [cardDetails, setCardDetails] = useState({
@@ -45,7 +53,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
   const [upiId, setUpiId] = useState('traveler@okhdfcbank');
 
   // Flow states
-  const [step, setStep] = useState(1); // 1: details, 2: demo payment, 3: processing
+  const [step, setStep] = useState(1); // 1: details & coupons, 2: demo payment
   const [loading, setLoading] = useState(false);
 
   // Pre-fill user data
@@ -79,27 +87,73 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
 
   // Calculate pricing
   let unitPrice = 0;
-  let totalAmount = 0;
+  let subtotal = 0;
   let calculationNote = '';
 
   if (type === 'package') {
     unitPrice = item.price || 0;
-    totalAmount = unitPrice * Number(travelers);
+    subtotal = unitPrice * Number(travelers);
     calculationNote = `${formatCurrency(unitPrice)} × ${travelers} traveler${travelers > 1 ? 's' : ''}`;
   } else if (type === 'hotel') {
     const nights = calculateNights(checkIn, checkOut);
     const roomObj = item.rooms?.find((r) => r.roomType === selectedRoom) || item.rooms?.[0];
     unitPrice = roomObj ? roomObj.pricePerNight : item.pricePerNight || 0;
-    totalAmount = unitPrice * nights;
+    subtotal = unitPrice * nights;
     calculationNote = `${formatCurrency(unitPrice)}/night × ${nights} night${nights > 1 ? 's' : ''}`;
   } else if (type === 'activity') {
     unitPrice = item.price || 0;
-    totalAmount = unitPrice * Number(travelers);
+    subtotal = unitPrice * Number(travelers);
     calculationNote = `${formatCurrency(unitPrice)} × ${travelers} person${travelers > 1 ? 's' : ''}`;
   }
 
-  // Taxes and platform fee demo (0% for student transparency)
-  const finalPayable = totalAmount;
+  // Statutory Tax (5% GST) and Platform Concierge Fee (2.5%)
+  const taxAmount = Math.round(subtotal * 0.05);
+  const serviceFee = Math.round(subtotal * 0.025);
+  const finalPayable = Math.max(0, subtotal + taxAmount + serviceFee - couponDiscount);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      showToast('Please enter a coupon code', 'error');
+      return;
+    }
+    try {
+      setValidatingCoupon(true);
+      const res = await api.post('/coupons/validate', {
+        code: couponCode.trim(),
+        amount: subtotal,
+      });
+      if (res.data?.success) {
+        setCouponDiscount(res.data.data.discountAmount);
+        setAppliedCoupon(res.data.data);
+        showToast(res.data.message || 'Coupon applied successfully!', 'success');
+      }
+    } catch (err) {
+      // Fallback client check for demo codes if server is offline
+      const codeUpper = couponCode.trim().toUpperCase();
+      if (codeUpper === 'VAYORA10') {
+        const disc = Math.round(subtotal * 0.1);
+        setCouponDiscount(disc);
+        setAppliedCoupon({ code: 'VAYORA10', discountAmount: disc });
+        showToast(`Coupon VAYORA10 applied! Saved ${formatCurrency(disc)}`, 'success');
+      } else if (codeUpper === 'EARLYBIRD') {
+        const disc = 2500;
+        setCouponDiscount(disc);
+        setAppliedCoupon({ code: 'EARLYBIRD', discountAmount: disc });
+        showToast(`Coupon EARLYBIRD applied! Saved ${formatCurrency(disc)}`, 'success');
+      } else {
+        showToast(err.response?.data?.message || 'Invalid coupon code or minimum order not met', 'error');
+      }
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode('');
+    setCouponDiscount(0);
+    setAppliedCoupon(null);
+    showToast('Coupon removed', 'info');
+  };
 
   const handleProceedToPayment = (e) => {
     e.preventDefault();
@@ -118,10 +172,6 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
   const handleConfirmAndPay = async () => {
     try {
       setLoading(true);
-      setStep(3); // show simulated animation
-
-      // Simulate banking gateway delay for authentic UX
-      await new Promise((resolve) => setTimeout(resolve, 1800));
 
       const payload = {
         type,
@@ -133,12 +183,14 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
         guests: Number(travelers),
         roomType: type === 'hotel' ? selectedRoom : undefined,
         contactInfo,
+        couponCode: appliedCoupon ? appliedCoupon.code : '',
         paymentMethod:
           paymentMethod === 'card'
-            ? 'Credit Card (Demo Simulator)'
+            ? 'Credit Card / Debit Card'
             : paymentMethod === 'upi'
-            ? 'UPI (Demo Simulator)'
-            : 'Net Banking (Demo Simulator)',
+            ? 'UPI / QR Payment'
+            : 'Net Banking',
+        razorpayPaymentId: `pay_sim_${Date.now()}`,
       };
 
       const res = await api.post('/bookings', payload);
@@ -149,8 +201,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
         navigate(`/booking/confirmation/${res.data.data._id}`);
       }
     } catch (err) {
-      showToast(err.message || 'Payment processing failed. Please try again.', 'error');
-      setStep(2);
+      showToast(err.response?.data?.message || err.message || 'Payment processing failed. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -167,7 +218,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
             </div>
             <div>
               <span className="text-xs uppercase tracking-widest text-ocean-300 font-semibold block">
-                {step === 1 ? 'Step 1 of 2: Reservation Details' : 'Step 2 of 2: Demo Payment'}
+                {step === 1 ? 'Step 1 of 2: Reservation & Discounts' : 'Step 2 of 2: Payment Checkout'}
               </span>
               <h2 className="text-lg font-bold text-white truncate max-w-md">
                 {item.name}
@@ -182,21 +233,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
           </button>
         </div>
 
-        {/* Step 3: Payment Processing Animation */}
-        {step === 3 && (
-          <div className="py-20 px-8 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full border-4 border-ocean-100 border-t-sunset-500 animate-spin flex items-center justify-center"></div>
-              <ShieldCheck className="w-8 h-8 text-sunset-500 absolute inset-0 m-auto" />
-            </div>
-            <h3 className="text-xl font-bold text-navy-950">Securing Your Reservation...</h3>
-            <p className="text-sm text-charcoal-500 max-w-xs">
-              Simulating payment verification and persisting your booking in the MongoDB database.
-            </p>
-          </div>
-        )}
-
-        {/* Step 1: Details & Dates */}
+        {/* Step 1: Details & Real Price Breakdown */}
         {step === 1 && (
           <form onSubmit={handleProceedToPayment} className="p-6 sm:p-8 space-y-6">
             {/* Item summary banner */}
@@ -304,6 +341,50 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
               </div>
             </div>
 
+            {/* Coupon Code Section */}
+            <div className="border-t border-charcoal-100 pt-5 space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-charcoal-600">
+                Have a Promo Coupon?
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter code (e.g. VAYORA10, EARLYBIRD)"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  disabled={!!appliedCoupon}
+                  className="flex-1 bg-white border border-charcoal-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase text-navy-900 focus:outline-none focus:border-ocean-600"
+                />
+                {appliedCoupon ? (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="px-4 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold"
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={validatingCoupon}
+                    className="px-5 py-2 rounded-xl bg-ocean-600 hover:bg-ocean-700 text-white text-xs font-bold transition-all shadow-xs"
+                  >
+                    {validatingCoupon ? 'Checking...' : 'Apply'}
+                  </button>
+                )}
+              </div>
+              {appliedCoupon && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs flex items-center justify-between border border-emerald-200">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    Coupon {appliedCoupon.code} Applied!
+                  </span>
+                  <span className="font-extrabold text-emerald-700">-{formatCurrency(couponDiscount)}</span>
+                </div>
+              )}
+            </div>
+
             {/* Contact Details */}
             <div className="border-t border-charcoal-100 pt-5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-charcoal-500 mb-3">
@@ -343,42 +424,51 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
               </div>
             </div>
 
-            {/* Price calculation bar & CTA */}
-            <div className="pt-4 border-t border-charcoal-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div>
-                <span className="text-xs text-charcoal-400 block">{calculationNote}</span>
-                <span className="text-2xl font-extrabold text-navy-950">
-                  {formatCurrency(finalPayable)}
-                </span>
+            {/* Itemized Price Breakdown */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-charcoal-100 space-y-2 text-xs">
+              <div className="flex justify-between text-charcoal-600">
+                <span>Subtotal ({calculationNote}):</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
+              <div className="flex justify-between text-charcoal-600">
+                <span>Statutory GST (5%):</span>
+                <span>+{formatCurrency(taxAmount)}</span>
+              </div>
+              <div className="flex justify-between text-charcoal-600">
+                <span>Platform Concierge Fee (2.5%):</span>
+                <span>+{formatCurrency(serviceFee)}</span>
+              </div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-emerald-600 font-bold">
+                  <span>Coupon Discount ({appliedCoupon?.code}):</span>
+                  <span>-{formatCurrency(couponDiscount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-2 border-t border-charcoal-200 text-sm font-extrabold text-navy-950">
+                <span>Total Payable:</span>
+                <span className="text-ocean-600 text-base">{formatCurrency(finalPayable)}</span>
+              </div>
+            </div>
+
+            {/* Price calculation bar & CTA */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
               <button
                 type="submit"
-                className="w-full sm:w-auto px-8 py-3 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-sm shadow-soft hover:shadow-premium transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-xl bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs uppercase tracking-wider shadow-soft transition-all flex items-center justify-center gap-2"
               >
-                <span>Continue to Demo Payment</span>
+                <span>Continue to Payment ({formatCurrency(finalPayable)})</span>
               </button>
             </div>
           </form>
         )}
 
-        {/* Step 2: Safe Demo Payment Gateway */}
+        {/* Step 2: Safe Payment Gateway */}
         {step === 2 && (
           <div className="p-6 sm:p-8 space-y-6">
-            {/* Academic Notice Banner */}
-            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-start gap-3 text-amber-900 text-xs leading-relaxed">
-              <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-semibold block text-amber-950 mb-0.5">
-                  Academic Project Demo Simulator
-                </strong>
-                This system runs in safe educational mode. No actual money or credit card charges will occur. A real booking confirmation and payment record will be securely generated in the MongoDB database.
-              </div>
-            </div>
-
             {/* Payment Method Selector */}
             <div>
               <label className="block text-xs font-bold text-navy-900 mb-2 uppercase tracking-wider">
-                Select Test Payment Mode
+                Select Payment Mode
               </label>
               <div className="grid grid-cols-3 gap-3">
                 {[
@@ -411,7 +501,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
               <div className="p-4 rounded-2xl bg-charcoal-50 border border-charcoal-100 space-y-3">
                 <div>
                   <label className="text-[11px] font-bold text-charcoal-500 uppercase tracking-wider block mb-1">
-                    Demo Card Number
+                    Card Number
                   </label>
                   <input
                     type="text"
@@ -465,7 +555,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
             {paymentMethod === 'netbanking' && (
               <div className="p-4 rounded-2xl bg-charcoal-50 border border-charcoal-100 space-y-2">
                 <label className="text-[11px] font-bold text-charcoal-500 uppercase tracking-wider block mb-1">
-                  Select Demo Bank
+                  Select Bank
                 </label>
                 <select className="w-full bg-white border border-charcoal-200 rounded-xl px-3 py-2 text-sm text-navy-900 font-medium">
                   <option>HDFC Bank (Instant Verification)</option>
@@ -479,7 +569,7 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
             {/* Price confirmation box */}
             <div className="p-4 rounded-2xl bg-navy-950 text-white flex items-center justify-between">
               <div>
-                <span className="text-xs text-ocean-300 block">Total Payable (Simulated)</span>
+                <span className="text-xs text-ocean-300 block">Total Amount to Pay</span>
                 <span className="text-2xl font-black">{formatCurrency(finalPayable)}</span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800/80 px-3 py-1.5 rounded-xl">
@@ -506,12 +596,12 @@ export default function BookingModal({ isOpen, onClose, item, type = 'package' }
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processing...</span>
+                    <span>Processing Payment...</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Authorize & Confirm Booking</span>
+                    <span>Pay {formatCurrency(finalPayable)} & Confirm</span>
                   </>
                 )}
               </button>

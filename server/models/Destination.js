@@ -7,6 +7,13 @@ const destinationSchema = new mongoose.Schema(
       required: [true, 'Destination name is required'],
       trim: true,
     },
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
     country: {
       type: String,
       required: [true, 'Country is required'],
@@ -57,11 +64,22 @@ const destinationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    coordinates: {
+      lat: { type: Number, default: 0 },
+      lng: { type: Number, default: 0 },
+    },
   },
   {
     timestamps: true,
   }
 );
+
+destinationSchema.pre('save', function (next) {
+  if (!this.slug && this.name) {
+    this.slug = this.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  }
+  next();
+});
 
 destinationSchema.index({ name: 'text', country: 'text', state: 'text', description: 'text' });
 

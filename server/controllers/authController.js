@@ -1,5 +1,8 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import emailService from '../services/emailService.js';
+import Notification from '../models/Notification.js';
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -9,11 +12,11 @@ const generateToken = (id) => {
   );
 };
 
-// @desc    Register a new user
+// @desc    Register a new user & trigger verification email
 // @route   POST /api/auth/register
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
+    const { name, email, password, confirmPassword, phone } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide all required fields' });
@@ -32,16 +35,42 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'An account with this email already exists' });
     }
 
-    // First user or specific email can be admin if needed, default is USER
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     const user = await User.create({
       name,
       email: email.toLowerCase(),
       password,
-      role: 'USER',
+      phone: phone || '',
+      role: 'CUSTOMER',
+      isVerified: true, // Mark verified for demo convenience, token is still tracked
+      verificationToken,
+      verificationTokenExpires: verificationExpires,
     });
+
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const verifyUrl = `${clientUrl}/verify-email?token=${verificationToken}`;
+
+    // Dispatch welcome & verification email
+    emailService.sendWelcomeVerification({
+      to: user.email,
+      name: user.name,
+      verificationUrl: verifyUrl,
+    }).catch(() => {});
+
+    // Create In-App Notification
+    await Notification.create({
+      user: user._id,
+      title: 'Welcome to VAYORA 🌟',
+      message: 'Explore handpicked luxury destinations and personalized itineraries.',
+      type: 'account',
+      link: '/destinations',
+    }).catch(() => {});
 
     res.status(201).json({
       success: true,
+      message: 'Registration successful. Welcome to VAYORA!',
       data: {
         _id: user._id,
         name: user.name,
@@ -51,6 +80,7 @@ export const registerUser = async (req, res) => {
         phone: user.phone,
         location: user.location,
         preferences: user.preferences,
+        isVerified: user.isVerified,
         token: generateToken(user._id),
       },
     });
@@ -85,9 +115,36 @@ export const loginUser = async (req, res) => {
         phone: user.phone,
         location: user.location,
         preferences: user.preferences,
+        isVerified: user.isVerified,
+        vendorProfile: user.vendorProfile,
         token: generateToken(user._id),
       },
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Verify email address via token
+// @route   GET /api/auth/verify-email/:token
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const user = await User.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Verification link is invalid or has expired' });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null;
+    user.verificationTokenExpires = null;
+    await user.save();
+
+    res.json({ success: true, message: 'Email verified successfully! You can now access all features.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -134,6 +191,7 @@ export const updateProfile = async (req, res) => {
         phone: updatedUser.phone,
         location: updatedUser.location,
         preferences: updatedUser.preferences,
+        isVerified: updatedUser.isVerified,
         token: generateToken(updatedUser._id),
       },
     });
@@ -169,7 +227,7 @@ export const changePassword = async (req, res) => {
   }
 };
 
-// @desc    Demo Forgot Password
+// @desc    Forgot Password
 // @route   POST /api/auth/forgot-password
 export const forgotPassword = async (req, res) => {
   try {
@@ -179,12 +237,62 @@ export const forgotPassword = async (req, res) => {
     }
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'No account registered with this email address' });
+      // Prevent account enumeration: return generic success notice
+      return res.json({
+        success: true,
+        message: 'If an account exists with this email, a password reset link has been dispatched.',
+      });
     }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetUrl = `${clientUrl}/reset-password?token=${resetToken}`;
+
+    emailService.sendPasswordReset({
+      to: user.email,
+      name: user.name,
+      resetUrl,
+    }).catch(() => {});
+
     res.json({
       success: true,
-      message: 'Password reset link sent to your registered email (Demo mode: Use your current password or sign in with demo accounts)',
+      message: 'If an account exists with this email, a password reset link has been dispatched.',
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reset Password with token
+// @route   POST /api/auth/reset-password/:token
+export const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Password reset token is invalid or has expired' });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully! You can now log in.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

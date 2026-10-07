@@ -14,12 +14,14 @@ import {
 import api from '../../api/client';
 import { useToast } from '../../context/ToastContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import InvoiceModal from '../../components/InvoiceModal';
 
 export default function MyBookings() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all'); // 'all' | 'confirmed' | 'cancelled'
   const [cancellingId, setCancellingId] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const { showToast } = useToast();
 
   const fetchBookings = async () => {
@@ -212,13 +214,21 @@ export default function MyBookings() {
 
               {/* Actions Footer */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-charcoal-50 text-xs">
-                <Link
-                  to={`/booking/confirmation/${b._id}`}
-                  className="inline-flex items-center gap-1.5 font-bold text-ocean-700 hover:text-ocean-800"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>View Printable Confirmation</span>
-                </Link>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setSelectedInvoice(b)}
+                    className="inline-flex items-center gap-1.5 font-bold text-ocean-700 hover:text-ocean-800"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Download Tax Invoice</span>
+                  </button>
+                  <Link
+                    to={`/booking/confirmation/${b._id}`}
+                    className="inline-flex items-center gap-1 text-charcoal-500 hover:text-charcoal-700"
+                  >
+                    <span>Voucher Receipt</span>
+                  </Link>
+                </div>
 
                 {b.bookingStatus === 'Confirmed' && (
                   <button
@@ -235,6 +245,12 @@ export default function MyBookings() {
           ))}
         </div>
       )}
+
+      <InvoiceModal
+        isOpen={!!selectedInvoice}
+        onClose={() => setSelectedInvoice(null)}
+        booking={selectedInvoice}
+      />
     </div>
   );
 }

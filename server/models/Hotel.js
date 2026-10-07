@@ -7,6 +7,13 @@ const hotelSchema = new mongoose.Schema(
       required: [true, 'Hotel name is required'],
       trim: true,
     },
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
     destination: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Destination',
@@ -52,6 +59,18 @@ const hotelSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Location address is required'],
     },
+    coordinates: {
+      lat: { type: Number, default: 0 },
+      lng: { type: Number, default: 0 },
+    },
+    checkInTime: {
+      type: String,
+      default: '14:00',
+    },
+    checkOutTime: {
+      type: String,
+      default: '11:00',
+    },
     featured: {
       type: Boolean,
       default: false,
@@ -61,6 +80,13 @@ const hotelSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+hotelSchema.pre('save', function (next) {
+  if (!this.slug && this.name) {
+    this.slug = this.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  }
+  next();
+});
 
 hotelSchema.index({ name: 'text', destinationName: 'text', location: 'text' });
 

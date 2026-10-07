@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
+      index: true,
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
         'Please provide a valid email address',
@@ -26,8 +27,9 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['USER', 'ADMIN'],
-      default: 'USER',
+      enum: ['CUSTOMER', 'USER', 'ADMIN', 'VENDOR', 'STAFF'],
+      default: 'CUSTOMER',
+      index: true,
     },
     phone: {
       type: String,
@@ -44,6 +46,35 @@ const userSchema = new mongoose.Schema(
     preferences: {
       type: [String],
       default: ['Culture', 'Nature', 'Beaches'],
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+      default: null,
+    },
+    verificationTokenExpires: {
+      type: Date,
+      default: null,
+    },
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+    },
+    vendorProfile: {
+      businessName: { type: String, default: '' },
+      businessType: { type: String, enum: ['Hotels & Resorts', 'Tour Operator', 'Experience Guide', 'Transport', 'Other', ''], default: '' },
+      address: { type: String, default: '' },
+      taxId: { type: String, default: '' },
+      isApproved: { type: Boolean, default: false },
+      rating: { type: Number, default: 5.0 },
+      appliedAt: { type: Date, default: null },
     },
   },
   {

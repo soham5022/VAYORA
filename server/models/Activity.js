@@ -7,6 +7,13 @@ const activitySchema = new mongoose.Schema(
       required: [true, 'Activity name is required'],
       trim: true,
     },
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
     destination: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Destination',
@@ -57,6 +64,13 @@ const activitySchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+activitySchema.pre('save', function (next) {
+  if (!this.slug && this.name) {
+    this.slug = this.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  }
+  next();
+});
 
 activitySchema.index({ name: 'text', destinationName: 'text', category: 'text' });
 

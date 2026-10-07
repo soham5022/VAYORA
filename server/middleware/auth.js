@@ -56,3 +56,6 @@ export const adminOnly = (req, res, next) => {
   }
   return res.status(403).json({ success: false, message: 'Access forbidden: Admin access required' });
 };
+
+export const admin = adminOnly;
+

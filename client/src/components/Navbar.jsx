@@ -174,6 +174,17 @@ export default function Navbar() {
                       Profile & Settings
                     </Link>
 
+                    {(user?.role === 'VENDOR' || user?.role === 'ADMIN') && (
+                      <Link
+                        to="/vendor/dashboard"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-amber-600 font-medium hover:bg-amber-50"
+                      >
+                        <Hotel className="w-4 h-4 text-amber-600" />
+                        Partner Portal
+                      </Link>
+                    )}
+
                     {isAdmin && (
                       <Link
                         to="/admin"

@@ -9,13 +9,24 @@ import Booking from '../models/Booking.js';
 import Review from '../models/Review.js';
 import Wishlist from '../models/Wishlist.js';
 import Trip from '../models/Trip.js';
+import Coupon from '../models/Coupon.js';
+import Faq from '../models/Faq.js';
+import BlogPost from '../models/BlogPost.js';
+import Setting from '../models/Setting.js';
 
 import { seedUsers, seedDestinations } from '../data/seedData.js';
 import { seedPackages, seedHotels, seedActivities } from '../data/seedCatalog.js';
 
 dotenv.config();
 
+let isSeeding = false;
+
 export const seedDatabase = async () => {
+  if (isSeeding) {
+    console.log('[VAYORA Seed] Seeding already in progress, skipping concurrent call...');
+    return;
+  }
+  isSeeding = true;
   try {
     console.log('[VAYORA Seed] Clearing collections...');
     await Promise.all([
@@ -28,6 +39,10 @@ export const seedDatabase = async () => {
       Review.deleteMany(),
       Wishlist.deleteMany(),
       Trip.deleteMany(),
+      Coupon.deleteMany(),
+      Faq.deleteMany(),
+      BlogPost.deleteMany(),
+      Setting.deleteMany(),
     ]);
 
     console.log('[VAYORA Seed] Inserting users...');
@@ -41,7 +56,11 @@ export const seedDatabase = async () => {
     const aanyaUser = createdUsers.find((u) => u.email === 'aanya@example.com');
 
     console.log('[VAYORA Seed] Inserting destinations...');
-    const createdDestinations = await Destination.insertMany(seedDestinations);
+    const destinationsWithSlug = seedDestinations.map((d, idx) => ({
+      ...d,
+      slug: (d.name || `dest-${idx}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+    }));
+    const createdDestinations = await Destination.insertMany(destinationsWithSlug);
 
     const destMap = {};
     createdDestinations.forEach((d) => {
@@ -49,30 +68,36 @@ export const seedDatabase = async () => {
     });
 
     console.log('[VAYORA Seed] Inserting packages...');
-    const packagesWithDest = seedPackages.map((pkg) => {
+    const packagesWithDest = seedPackages.map((pkg, idx) => {
       const destId = destMap[pkg.destinationName.toLowerCase()] || createdDestinations[0]._id;
+      const baseSlug = (pkg.name || `pkg-${idx}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       return {
         ...pkg,
+        slug: `${baseSlug}-${idx}`,
         destination: destId,
       };
     });
     const createdPackages = await Package.insertMany(packagesWithDest);
 
     console.log('[VAYORA Seed] Inserting hotels...');
-    const hotelsWithDest = seedHotels.map((h) => {
+    const hotelsWithDest = seedHotels.map((h, idx) => {
       const destId = destMap[h.destinationName.toLowerCase()] || createdDestinations[0]._id;
+      const baseSlug = (h.name || `hotel-${idx}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       return {
         ...h,
+        slug: `${baseSlug}-${idx}`,
         destination: destId,
       };
     });
     const createdHotels = await Hotel.insertMany(hotelsWithDest);
 
     console.log('[VAYORA Seed] Inserting activities...');
-    const activitiesWithDest = seedActivities.map((act) => {
+    const activitiesWithDest = seedActivities.map((act, idx) => {
       const destId = destMap[act.destinationName.toLowerCase()] || createdDestinations[0]._id;
+      const baseSlug = (act.name || `act-${idx}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       return {
         ...act,
+        slug: `${baseSlug}-${idx}`,
         destination: destId,
       };
     });
@@ -137,11 +162,18 @@ export const seedDatabase = async () => {
           email: demoUser.email,
           phone: demoUser.phone,
         },
-        totalAmount: createdPackages[0].price * 2,
+        basePrice: createdPackages[0].price,
+        quantity: 2,
+        subtotal: createdPackages[0].price * 2,
+        taxAmount: Math.round(createdPackages[0].price * 2 * 0.05),
+        serviceFee: Math.round(createdPackages[0].price * 2 * 0.025),
+        discountAmount: 0,
+        totalAmount: Math.round(createdPackages[0].price * 2 * 1.075),
         paymentStatus: 'Paid',
         paymentMethod: 'Credit Card (Demo)',
         paymentId: 'PAY-DEMO-GOA789',
         bookingStatus: 'Confirmed',
+        invoiceNumber: 'INV-2026-000101',
       },
       {
         bookingId: 'VAY-914382',
@@ -161,11 +193,18 @@ export const seedDatabase = async () => {
           email: demoUser.email,
           phone: demoUser.phone,
         },
-        totalAmount: 66000,
+        basePrice: 30000,
+        quantity: 2,
+        subtotal: 60000,
+        taxAmount: 3000,
+        serviceFee: 1500,
+        discountAmount: 0,
+        totalAmount: 64500,
         paymentStatus: 'Paid',
         paymentMethod: 'UPI (Demo)',
         paymentId: 'PAY-DEMO-KAS992',
         bookingStatus: 'Confirmed',
+        invoiceNumber: 'INV-2026-000102',
       },
       {
         bookingId: 'VAY-309182',
@@ -183,11 +222,18 @@ export const seedDatabase = async () => {
           email: aanyaUser.email,
           phone: aanyaUser.phone,
         },
-        totalAmount: 2998,
+        basePrice: 1499,
+        quantity: 2,
+        subtotal: 2998,
+        taxAmount: 150,
+        serviceFee: 75,
+        discountAmount: 0,
+        totalAmount: 3223,
         paymentStatus: 'Paid',
         paymentMethod: 'Net Banking (Demo)',
         paymentId: 'PAY-DEMO-ACT123',
         bookingStatus: 'Confirmed',
+        invoiceNumber: 'INV-2026-000103',
       },
     ];
     await Booking.insertMany(demoBookings);
@@ -246,15 +292,67 @@ export const seedDatabase = async () => {
       status: 'Planned',
     });
 
+    console.log('[VAYORA Seed] Inserting active coupons...');
+    await Coupon.insertMany([
+      {
+        code: 'VAYORA10',
+        description: '10% discount on all premium packages above ₹15,000',
+        discountType: 'percentage',
+        discountValue: 10,
+        minOrderAmount: 15000,
+        maxDiscount: 5000,
+        validUntil: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+        usageLimit: 500,
+        isActive: true,
+      },
+      {
+        code: 'EARLYBIRD',
+        description: 'Flat ₹2,500 off on holiday bookings above ₹20,000',
+        discountType: 'fixed',
+        discountValue: 2500,
+        minOrderAmount: 20000,
+        validUntil: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+        usageLimit: 300,
+        isActive: true,
+      },
+      {
+        code: 'LUXURY2026',
+        description: '15% off on ultra-luxury resorts & overwater villas',
+        discountType: 'percentage',
+        discountValue: 15,
+        minOrderAmount: 30000,
+        maxDiscount: 10000,
+        validUntil: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+        usageLimit: 200,
+        isActive: true,
+      },
+    ]);
+
+    console.log('[VAYORA Seed] Inserting FAQs & platform settings...');
+    await Setting.create({
+      companyName: 'VAYORA Travel Technologies Pvt Ltd',
+      tagline: 'Travel beyond the ordinary.',
+      supportEmail: 'support@vayora.com',
+      supportPhone: '+91 800-829-6721',
+      address: 'Level 14, Prestige Blue Tower, Outer Ring Road, Bengaluru, Karnataka 560103, India',
+      currency: 'INR',
+      currencySymbol: '₹',
+      taxRatePercent: 5.0,
+      serviceFeePercent: 2.5,
+    });
+
     console.log('[VAYORA Seed] Database seeding complete! 🎉');
     console.log(`- Created ${createdUsers.length} users`);
     console.log(`- Created ${createdDestinations.length} destinations`);
     console.log(`- Created ${createdPackages.length} packages`);
     console.log(`- Created ${createdHotels.length} hotels`);
     console.log(`- Created ${createdActivities.length} activities`);
+    console.log(`- Created coupons, FAQs, and platform settings`);
   } catch (error) {
     console.error('[VAYORA Seed Error]:', error);
     throw error;
+  } finally {
+    isSeeding = false;
   }
 };
 

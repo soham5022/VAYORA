@@ -29,6 +29,25 @@ export const seedUsers = [
     location: 'Bengaluru, India',
     preferences: ['Mountain', 'Relaxation', 'Wildlife'],
   },
+  {
+    name: 'Himalayan Escapes & Partner Villas',
+    email: 'vendor@vayora.com',
+    password: 'Vendor@123',
+    role: 'VENDOR',
+    phone: '+91 98450 77123',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    location: 'Srinagar, Jammu & Kashmir',
+    preferences: ['Mountain', 'Luxury Stays'],
+    vendorProfile: {
+      businessName: 'Himalayan Escapes Luxury Stays',
+      businessType: 'Hotels & Resorts',
+      address: 'Boulevard Road, Dal Lake, Srinagar 190001',
+      taxId: '01AABCH9912L1Z9',
+      isApproved: true,
+      rating: 5.0,
+      appliedAt: new Date(),
+    },
+  },
 ];
 
 export const seedDestinations = [
