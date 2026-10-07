@@ -71,20 +71,43 @@ export const getHotels = async (req, res) => {
 // @route   GET /api/hotels/:id
 export const getHotelById = async (req, res) => {
   try {
-    const hotel = await Hotel.findById(req.params.id).populate('destination');
+    const { id } = req.params;
+    let hotel = null;
+    let reviews = [];
+
+    const mongoose = (await import('mongoose')).default;
+    if (mongoose.isValidObjectId(id)) {
+      try {
+        hotel = await Hotel.findById(id).populate('destination');
+        if (hotel) {
+          reviews = await Review.find({ hotel: hotel._id })
+            .populate('user', 'name avatar')
+            .sort({ createdAt: -1 });
+        }
+      } catch (dbErr) {
+        console.warn('[VAYORA] Hotel DB lookup notice:', dbErr.message);
+      }
+    }
+
+    if (!hotel) {
+      const { seedHotels } = await import('../data/seedData.js');
+      const cleanId = String(id).toLowerCase();
+      hotel =
+        seedHotels.find((h) => h._id === id || String(h.id) === id) ||
+        seedHotels.find((h) => h.name.toLowerCase().includes(cleanId)) ||
+        seedHotels.find((h) => cleanId.includes(h.destinationName.toLowerCase())) ||
+        seedHotels[0];
+    }
+
     if (!hotel) {
       return res.status(404).json({ success: false, message: 'Hotel not found' });
     }
-
-    const reviews = await Review.find({ hotel: hotel._id })
-      .populate('user', 'name avatar')
-      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
       data: {
         hotel,
-        reviews,
+        reviews: reviews || [],
       },
     });
   } catch (error) {

@@ -305,3 +305,6 @@ export const seedDestinations = [
     featured: false,
   },
 ];
+
+export { seedPackages, seedHotels, seedActivities } from './seedCatalog.js';
+

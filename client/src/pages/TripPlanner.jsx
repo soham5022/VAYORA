@@ -21,6 +21,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, calculateNights } from '../utils/formatters';
 
+import { fallbackDestinations } from '../data/fallbackData';
+
 export default function TripPlanner() {
   const [searchParams] = useSearchParams();
   const prefilledDest = searchParams.get('destination') || 'Goa';
@@ -38,7 +40,7 @@ export default function TripPlanner() {
 
   // Results state
   const [generatedPlan, setGeneratedPlan] = useState(null);
-  const [availableDestinations, setAvailableDestinations] = useState([]);
+  const [availableDestinations, setAvailableDestinations] = useState(() => fallbackDestinations);
   const [loadingDestinations, setLoadingDestinations] = useState(false);
   const [saving, setSaving] = useState(false);
 

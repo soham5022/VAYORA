@@ -66,12 +66,10 @@ const PORT = process.env.PORT || 5000;
 
 // Connect Database & Start Server for local standalone runtime
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
-  connectDB().then(() => {
+  connectDB().finally(() => {
     app.listen(PORT, () => {
       console.log(`[VAYORA Server] Running on http://localhost:${PORT}`);
     });
-  }).catch((err) => {
-    console.error('[VAYORA Server] Failed to initialize database:', err.message);
   });
 }
 

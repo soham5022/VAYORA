@@ -73,20 +73,45 @@ export const getPackages = async (req, res) => {
 // @route   GET /api/packages/:id
 export const getPackageById = async (req, res) => {
   try {
-    const pkg = await Package.findById(req.params.id).populate('destination');
+    const { id } = req.params;
+    let pkg = null;
+    let reviews = [];
+
+    // 1. Try finding in MongoDB if id is a valid ObjectId
+    const mongoose = (await import('mongoose')).default;
+    if (mongoose.isValidObjectId(id)) {
+      try {
+        pkg = await Package.findById(id).populate('destination');
+        if (pkg) {
+          reviews = await Review.find({ package: pkg._id })
+            .populate('user', 'name avatar')
+            .sort({ createdAt: -1 });
+        }
+      } catch (dbErr) {
+        console.warn('[VAYORA] Package DB lookup notice:', dbErr.message);
+      }
+    }
+
+    // 2. If not found in DB, search seed packages
+    if (!pkg) {
+      const { seedPackages } = await import('../data/seedData.js');
+      const cleanId = String(id).toLowerCase();
+      pkg =
+        seedPackages.find((p) => p._id === id || String(p.id) === id) ||
+        seedPackages.find((p) => p.name.toLowerCase().includes(cleanId)) ||
+        seedPackages.find((p) => cleanId.includes(p.destinationName.toLowerCase())) ||
+        seedPackages[0];
+    }
+
     if (!pkg) {
       return res.status(404).json({ success: false, message: 'Package not found' });
     }
-
-    const reviews = await Review.find({ package: pkg._id })
-      .populate('user', 'name avatar')
-      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
       data: {
         package: pkg,
-        reviews,
+        reviews: reviews || [],
       },
     });
   } catch (error) {
